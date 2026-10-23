@@ -1,61 +1,26 @@
-name: Continuous Integration
-
+name: Rustfava compatibility
 on:
   push:
-    branches:
-    - main
-    - v[0-9]+
+    branches: [main]
   pull_request:
-    branches:
-    - main
-    - v[0-9]+
-  schedule:
-  - cron: "17 5 * * 5"
-
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  e2e:
+  compatibility:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        fava_version: [default, latest]
     steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v7
-
-    - name: Install Node.js
-      uses: actions/setup-node@v7
-      with:
-        node-version-file: .node-version
-
-    - name: Upgrade to latest Fava version
-      if: matrix.fava_version == 'latest'
-      run: |
-        uv lock --upgrade-package fava
-        git add uv.lock
-        echo "DISABLE_SNAPSHOT_TESTS=true" >> $GITHUB_ENV
-
-    - name: Install dependencies
-      run: make deps
-
-    - name: Run linters
-      run: |
-        make lint
-        make format
-        make build
-        git diff --exit-code
-
-    - name: Run tests
-      run: make test
-
-    - name: Run e2e tests
-      run: make test-e2e
-
-    - name: Upload test results
-      if: ${{ failure() }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: test-results
-        path: frontend/test-results
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - run: make deps
+      - run: make build
+      - run: make test
+      - run: uv build

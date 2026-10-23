@@ -1,184 +1,245 @@
+"""Rustfava adapter for the fava-dashboards frontend."""
+
+from __future__ import annotations
+
 import datetime
-import functools
 import json
-import logging
-import os
+from collections import OrderedDict
+from threading import RLock
 import traceback
-from dataclasses import asdict
-from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
-from fava.context import g
-from fava.ext import FavaExtensionBase
-from fava.ext import extension_endpoint
-from fava.helpers import FavaAPIError
+from flask import jsonify
 from flask import request
+from rustfava.context import g
+from rustfava.core.query_shell import FavaQueryRunner
+from rustfava.ext import RustfavaExtensionBase
+from rustfava.ext import extension_endpoint
+from rustfava.helpers import RustfavaAPIError
+from rustfava.rustledger.types import RLAmount
+from rustfava.rustledger.types import RLPosition
 
-from fava_dashboards import legacy
-from fava_dashboards.utils import clamp_to_ledger_range
-from fava_dashboards.utils import get_ledger_duration
-from fava_dashboards.utils import read_dashboards_tsx
-from fava_dashboards.utils import read_dashboards_yaml
-
-logger = logging.getLogger(__name__)
-if loglevel := os.environ.get("LOGLEVEL"):
-    logger.setLevel(loglevel.upper())
-
-
-@dataclass(frozen=True)
-class ExtConfig:
-    dashboards_path: Path
-
-
-@dataclass(frozen=True)
-class LedgerData:  # pylint: disable=invalid-name,too-many-instance-attributes
-    dateFirst: datetime.date
-    dateLast: datetime.date
-    filterFirst: Optional[datetime.date]
-    filterLast: Optional[datetime.date]
-    operatingCurrencies: List[str]
-    ccy: str
-    accounts: Dict[str, Any]
-    commodities: Dict[str, Any]
+from .period_cache import PeriodCache
 
 
 def api_response(func):
-    """return {success: true, data: ...} or {success: false, error: ...}"""
+    """Keep the response envelope expected by the upstream frontend."""
 
-    @functools.wraps(func)
     def decorator(*args, **kwargs):
         try:
-            data = func(*args, **kwargs)
-            return {"success": True, "data": data}
-        except FavaAPIError as e:
-            return {"success": False, "error": e.message}, 500
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            traceback.print_exception(e)
-            return {"success": False, "error": str(e)}, 500
+            return jsonify({"success": True, "data": func(*args, **kwargs)})
+        except RustfavaAPIError as error:
+            return jsonify({"success": False, "error": error.message}), 500
+        except Exception as error:  # noqa: BLE001 - API errors must use the frontend response envelope.
+            traceback.print_exception(error)
+            return jsonify({"success": False, "error": str(error)}), 500
 
+    decorator.__name__ = func.__name__
     return decorator
 
 
 SCRIPT_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js", ".cjs", ".mjs"]
 
 
-class FavaDashboards(FavaExtensionBase):
+def _json_value(value: Any) -> Any:
+    """Convert rustledger query values to the shapes used by fava-dashboards."""
+    if isinstance(value, RLAmount):
+        return {"number": float(value.number), "currency": value.currency}
+    if isinstance(value, RLPosition):
+        cost = value.cost
+        return {
+            "units": _json_value(value.units),
+            "cost": (
+                {
+                    "number": _json_value(cost.number),
+                    "currency": cost.currency,
+                    "date": _json_value(cost.date),
+                }
+                if cost is not None
+                else None
+            ),
+        }
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_json_value(item) for item in value]
+    if hasattr(value, "items"):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    return value
+
+
+def _clean_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    """Drop Rustfava's internal source-location metadata from the API."""
+    internal_keys = {"filename", "lineno", "hash", "__tolerances__"}
+    return _json_value({key: item for key, item in meta.items() if key not in internal_keys})
+
+
+class FavaDashboards(RustfavaExtensionBase):
+    """Run fava-dashboards pages and queries inside rustfava."""
+
     report_title = "Dashboards"
     has_js_module = True
 
-    def read_ext_config(self) -> ExtConfig:
-        cfg = self.config if isinstance(self.config, dict) else {}
+    def __init__(self, ledger, config=None):
+        self._query_lock = RLock()
+        self._query_states = OrderedDict()
+        super().__init__(ledger, config)
+        options = self.config if isinstance(self.config, dict) else {}
+        self._period_cache = None
+        if options.get("fast_time_filter", True):
+            self._period_cache = PeriodCache(ledger)
+            ledger.get_filtered = self._period_cache
 
-        if "config" in cfg:
-            dashboards_path = self.ledger.join_path(cfg["config"])
+    def after_load_file(self):
+        """Release period sessions and results whenever the ledger reloads."""
+        with self._query_lock:
+            self._query_states.clear()
+        if self._period_cache is not None:
+            self._period_cache.cache_clear()
+            self._period_cache.prepare()
+
+    def _query_result(self, entries, bql):
+        # Retain entries themselves so object IDs cannot be reused while cached.
+        # One lock also prevents parallel panels from preparing the same session.
+        with self._query_lock:
+            key = id(entries)
+            if key not in self._query_states:
+                if len(self._query_states) >= 4:
+                    self._query_states.popitem(last=False)
+                self._query_states[key] = (entries, FavaQueryRunner(self.ledger), OrderedDict(), 0)
+            self._query_states.move_to_end(key)
+            held_entries, runner, results, cache_bytes = self._query_states[key]
+            if bql in results:
+                results.move_to_end(bql)
+                return results[bql][0]
+            result = runner.run(held_entries, bql)
+            if isinstance(result, str):
+                raise RustfavaAPIError("query did not return a table")
+            columns = [column.name for column in result.description]
+            payload = {"result": [
+                {column: _json_value(value) for column, value in zip(columns, row)}
+                for row in result.fetchall()
+            ]}
+            size = len(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+            if size <= 2 * 1024 * 1024:
+                while results and (len(results) >= 64 or cache_bytes + size > 2 * 1024 * 1024):
+                    _, (_, old_size) = results.popitem(last=False)
+                    cache_bytes -= old_size
+                results[bql] = (payload, size)
+                cache_bytes += size
+                self._query_states[key] = (held_entries, runner, results, cache_bytes)
+            return payload
+
+    def _config_path(self) -> Path:
+        config = self.config if isinstance(self.config, dict) else {}
+        ledger_dir = Path(self.ledger.beancount_file_path).parent
+        if "config" in config:
+            return (ledger_dir / config["config"]).resolve()
+        for extension in [*SCRIPT_EXTENSIONS, ".yaml"]:
+            candidate = ledger_dir / f"dashboards{extension}"
+            if candidate.exists():
+                return candidate
+        return ledger_dir / "dashboards.tsx"
+
+    def _get_ledger_data(self) -> dict[str, Any]:
+        filtered = g.filtered
+        transactions = [entry for entry in filtered.entries if entry.__class__.__name__.endswith("Transaction")]
+        if not transactions:
+            # Empty periods still need metadata so charts can display zero activity.
+            transactions = [
+                entry for entry in self.ledger.all_entries if entry.__class__.__name__.endswith("Transaction")
+            ]
+        if not transactions:
+            raise RustfavaAPIError("no transactions found in the ledger")
+
+        ledger_first = transactions[0].date
+        ledger_last = max(entry.date for entry in transactions)
+        date_range = filtered.date_range
+        if date_range:
+            filter_first = date_range.begin
+            filter_last = date_range.end - datetime.timedelta(days=1)
+            date_first = max(filter_first, ledger_first)
+            date_last = min(filter_last, ledger_last)
+            if date_first > date_last:
+                date_first, date_last = filter_first, filter_last
         else:
-            default_paths = [self.ledger.join_path(f"dashboards{ext}") for ext in [*SCRIPT_EXTENSIONS, ".yaml"]]
-            dashboards_path = default_paths[0]
-            for path in default_paths:
-                if path.exists():
-                    dashboards_path = path
-                    break
+            filter_first = filter_last = None
+            date_first, date_last = ledger_first, ledger_last
 
-        return ExtConfig(dashboards_path=dashboards_path)
+        currencies = list(self.ledger.options["operating_currency"])
+        if not currencies:
+            raise RustfavaAPIError("no operating currency specified in the ledger")
 
-    def read_dashboards_utils(self, dashboards_yaml):
-        utils = dashboards_yaml.get("utils", {})
-        if "inline" in utils:
-            return utils["inline"]
-        elif "path" in utils:
-            path = self.ledger.join_path(utils["path"])
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    return f.read()
-            except Exception as ex:
-                raise FavaAPIError(f"cannot read utils file {path}: {ex}") from ex
-        else:
-            return ""
-
-    def get_ledger_data(self):
-        operating_currencies = self.ledger.options["operating_currency"]
-        if len(operating_currencies) == 0:
-            raise FavaAPIError("no operating currency specified in the ledger")
-
-        if g.filtered.date_range:
-            filter_first = g.filtered.date_range.begin
-            filter_last = g.filtered.date_range.end - datetime.timedelta(days=1)
-            # Use filtered ledger here, as another filter (e.g. tag filter) could be applied.
-            ledger_date_first, ledger_date_last = get_ledger_duration(g.filtered.entries)
-            # Adjust the dates to align with ledger data.
-            date_first, date_last = clamp_to_ledger_range(
-                filter_first, filter_last, ledger_date_first, ledger_date_last
-            )
-        else:
-            # No time filter applied.
-            filter_first = None
-            filter_last = None
-            # Use filtered ledger here, as another filter (e.g. tag filter) could be applied.
-            date_first, date_last = get_ledger_duration(g.filtered.entries)
-
-        commodities = {c.currency: c for c in self.ledger.all_entries_by_type.Commodity}
-        accounts = self.ledger.accounts
-        return LedgerData(
-            dateFirst=date_first,
-            dateLast=date_last,
-            filterFirst=filter_first,
-            filterLast=filter_last,
-            operatingCurrencies=list(operating_currencies),
-            ccy=operating_currencies[0],
-            accounts=accounts,
-            commodities=commodities,
-        )
+        accounts = {name: {"meta": _clean_meta(account.meta)} for name, account in self.ledger.accounts.items()}
+        commodities = {
+            entry.currency: {
+                "currency": entry.currency,
+                "meta": _clean_meta(entry.meta),
+            }
+            for entry in self.ledger.all_entries_by_type.Commodity
+        }
+        return {
+            "dateFirst": date_first.isoformat(),
+            "dateLast": date_last.isoformat(),
+            "filterFirst": filter_first.isoformat() if filter_first else None,
+            "filterLast": filter_last.isoformat() if filter_last else None,
+            "operatingCurrencies": currencies,
+            "ccy": currencies[0],
+            "accounts": accounts,
+            "commodities": commodities,
+        }
 
     @extension_endpoint("query")
     @api_response
-    def api_v1_query(self):
+    def api_query(self):
         bql = request.args.get("bql")
+        if not bql:
+            raise RustfavaAPIError("missing bql query")
+        return self._query_result(g.filtered.entries_with_all_prices, bql)
 
-        _, result, _ = legacy.exec_query(self.ledger, bql)
-
-        legacy.sanitize_query_result(result)
-        return {"result": result}
-
-    @extension_endpoint("v1_render_panel", ["POST"])
+    @extension_endpoint("report_postings")
     @api_response
-    def api_v1_render_panel(self):
-        ledger = asdict(self.get_ledger_data())
-        panel = request.get_json().get("panel", {})
+    def api_report_postings(self):
+        """Serialize already loaded postings for full-history cash/debt reports.
 
-        ctx = legacy.PanelCtx(ledger=ledger, favaledger=self.ledger, panel=panel)
-        try:
-            legacy.process_panel(ctx)
-        except Exception as ex:
-            raise FavaAPIError(f'error processing panel "{panel.get("title", "")}": {ex}') from ex
-
-        return {"panel": ctx.panel}
+        Uses Rustfava's filtered entries, just as the query endpoint does.
+        Avoids a second WASM-to-Python table conversion for every posting.
+        """
+        rows = []
+        for index, entry in enumerate(g.filtered.entries):
+            if not entry.__class__.__name__.endswith("Transaction"):
+                continue
+            for posting in entry.postings:
+                if posting.units is None or posting.units.currency != "KRW":
+                    continue
+                rows.append({
+                    "date": entry.date.isoformat(),
+                    "account": posting.account,
+                    "units": _json_value(posting.units),
+                    "tags": sorted(entry.tags or []),
+                    "txid": str(index),
+                })
+        return {"result": rows}
 
     @extension_endpoint("v2_config")
     @api_response
     def api_v2_config(self):
-        ext_config = self.read_ext_config()
-
-        dashboard_ext = ext_config.dashboards_path.suffix
-        if dashboard_ext in SCRIPT_EXTENSIONS:
-            config_js = read_dashboards_tsx(ext_config.dashboards_path)
-            return {"configJs": config_js}
-        elif dashboard_ext == ".yaml":
-            # backwards compat
-            dashboards_yaml = read_dashboards_yaml(ext_config.dashboards_path)
-            if dashboards_yaml is None:
-                dashboards_yaml = {}
-            config_js = "export default " + json.dumps(dashboards_yaml)
-            utils = self.read_dashboards_utils(dashboards_yaml)
-            return {"configJs": config_js, "utilsJs": utils}
-        else:
-            raise FavaAPIError(f'invalid dashboard file "{ext_config.dashboards_path}"')
+        path = self._config_path()
+        if path.suffix not in SCRIPT_EXTENSIONS:
+            raise RustfavaAPIError(f'invalid dashboard file "{path}"')
+        try:
+            config_js = path.read_text(encoding="utf-8")
+        except OSError as error:
+            raise RustfavaAPIError(f"cannot read configuration file {path}: {error}") from error
+        return {"configJs": config_js}
 
     @extension_endpoint("v2_ledger")
     @api_response
     def api_v2_ledger(self):
-        ledger_data = self.get_ledger_data()
-        return {"ledgerData": ledger_data}
+        return {"ledgerData": self._get_ledger_data()}

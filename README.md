@@ -1,151 +1,87 @@
-# Fava Dashboards
-[![Continuous Integration](https://github.com/andreasgerstmayr/fava-dashboards/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/andreasgerstmayr/fava-dashboards/actions/workflows/continuous-integration.yml)
-[![PyPI](https://img.shields.io/pypi/v/fava-dashboards)](https://pypi.org/project/fava-dashboards/)
+# rustfava-dashboards
 
-fava-dashboards allows creating custom dashboards in [Fava](https://github.com/beancount/fava).
+[fava-dashboards](https://github.com/andreasgerstmayr/fava-dashboards)를 Rustfava 웹 서버에서 사용하는 실험적 호환 확장이다. 원본 React·차트 프런트엔드를 재사용하며, Rustfava와 rustledger에 맞춘 Python 어댑터를 제공한다. 데스크톱 앱은 필요하지 않다.
 
-Example dashboards with random data:
-<a href="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Overview-1-chromium-linux.png">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Dark-Theme-Overview-1-chromium-linux.png">
-    <img alt="Overview" src="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Overview-1-chromium-linux.png">
-  </picture>
-</a>
-<a href="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Assets-1-chromium-linux.png">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Dark-Theme-Assets-1-chromium-linux.png">
-    <img alt="Assets" src="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Assets-1-chromium-linux.png">
-  </picture>
-</a>
-<a href="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Income-and-Expenses-1-chromium-linux.png">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Dark-Theme-Income-and-Expenses-1-chromium-linux.png">
-    <img alt="Income and Expenses" src="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Income-and-Expenses-1-chromium-linux.png">
-  </picture>
-</a>
-<a href="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Sankey-1-chromium-linux.png">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Dark-Theme-Sankey-1-chromium-linux.png">
-    <img alt="Sankey" src="https://github.com/andreasgerstmayr/fava-dashboards/raw/main/frontend/tests/e2e/snapshots.test.ts-snapshots/PNG-Snapshot-Tests-Light-Theme-Sankey-1-chromium-linux.png">
-  </picture>
-</a>
+**현재 상태: 알파.** Rustfava 1.32.0, rustledger WASM 0.22.0, Python 3.14 환경에서 검증했다. PyPI 배포는 하지 않았다. 일반 Fava용 확장은 원본 저장소를 사용한다.
 
-[More screenshots](https://github.com/andreasgerstmayr/fava-dashboards/tree/main/frontend/tests/e2e/snapshots.test.ts-snapshots)
+## 제공 기능
 
-## Installation
-```
-pip install fava-dashboards
+- 왼쪽 메뉴의 `Dashboards` 확장 페이지와 TSX 설정
+- rustledger BQL 결과의 Amount·Position·잔액·날짜 변환
+- 기간·계정·검색 필터, 한글 탭 주소, 기간 변경 후 화면 갱신
+- 통합 합성 예제: 종합, 자산, 수익·비용, 흐름도, 순자산 전망, 손익, 현금흐름, 대출
+- 한국어 패널 제목·월별 손익 표와 숫자 내용에 맞춘 열 너비
+- 계정별 수익·비용 차트, 제한된 크기의 조회 결과 및 기간별 쿼리 세션 캐시
+
+## 설치와 합성 예제
+
+Python 3.13 이상이 필요하다. 아래 명령은 별도 가상환경에서 실행한다. 예제의 거래·금액·투자상품·물가지수는 전부 합성 자료이다.
+
+```sh
+git clone https://github.com/MunsuBahk/rustfava-dashboards.git
+cd rustfava-dashboards
+uv venv --python 3.14
+uv pip install .
+.venv/bin/python example/integrated/build_config.py
+.venv/bin/rustfava --host 127.0.0.1 --port 5099 --read-only --poll-watcher example/integrated/demo.beancount
 ```
 
-Enable this plugin in Fava by adding the following lines to your ledger:
-```
-2010-01-01 custom "fava-extension" "fava_dashboards"
-```
+브라우저에서 다음 주소를 연다.
 
-## Configuration
-The plugin looks by default for a `dashboards.tsx` file (or `.ts`, `.js[x]`, `.[cm]js`) in the directory of the Beancount ledger (e.g. if you run `fava personal.beancount`, the `dashboards.tsx` file should be in the same directory as `personal.beancount`).
-The location of the `dashboards.tsx` configuration file can be customized:
-```
-2010-01-01 custom "fava-extension" "fava_dashboards" "{
-    'config': '/path/to/dashboards.tsx'
-}"
+<http://127.0.0.1:5099/dashboard-preview/extension/FavaDashboards/?time=2025-02&dashboard=종합>
+
+설치물에는 빌드한 프런트엔드가 포함되어 있어 실행에 Node.js가 필요하지 않다. 소스를 수정할 때는 아래 개발 절차를 사용한다.
+
+자체 장부에 연결할 때는 장부 디렉터리의 `dashboards.tsx`를 읽는다. 확장 등록 형식은 다음과 같다.
+
+```beancount
+2025-01-01 custom "fava-extension" "fava_dashboards"
 ```
 
-Please take a look at the example dashboards configuration [dashboards.tsx](example/dashboards.tsx), which uses most of the functionality described below.
-To get TypeScript type support, download [fava-dashboards.d.ts](example/fava-dashboards.d.ts) and place it next to `dashboards.tsx`.
+설정 파일 경로를 지정하거나 기간 최적화를 끌 수도 있다.
 
-To convert a legacy `dashboards.yaml` file from version 1 to the new `dashboards.tsx` format, you can run `make deps && uv run scripts/convert_dashboards_yaml_to_tsx.py path/to/dashboards.yaml --output path/to/dashboards.tsx`.
-This script covers most common cases, and does not perform TypeScript type inference.
+```beancount
+2025-01-01 custom "fava-extension" "fava_dashboards" "{'config': 'my-dashboards.tsx', 'fast_time_filter': False}"
+```
 
-The dashboard configuration defines one or more [dashboards](#dashboard-properties), each with one or more [panels](#panel-properties).
-A panel has a relative width (e.g. `50%` for 2 columns, or `33.3%` for 3 column layouts) and an absolute height.
+기존 장부를 변경하지 않고 연결해야 하는 경우에는 [별도 실행 예제](scripts/run_dashboard.py)를 사용한다. 이 실행기는 읽기 전용 서버에 확장을 등록한다. Rustfava 설치 파일을 수정하지 않는다.
 
-### Configuration Properties
-* `dashboards`: list of [dashboards](#dashboard-properties)
-* `theme`: optional theme configuration
+```sh
+.venv/bin/python scripts/run_dashboard.py --ledger /path/to/main.beancount --config /path/to/dashboards.tsx --port 5099
+```
 
-The theme configuration supports:
-* `echarts`: optional ECharts theme name, or a custom ECharts theme object
-* `dashboard.panel.style`: optional custom MUI style properties for dashboard panels
+## 기간 조회 최적화
 
-### Dashboard Properties
-* `name`: dashboard name
-* `variables`: optional list of dashboard-level [variables](#variable-properties)
-* `panels`: list of [panels](#panel-properties)
+Rustfava 1.32에서는 새 기간을 조회할 때 전체 Python 거래 목록을 WASM 엔진으로 다시 전송한다. 이 확장은 장부를 엔진 세션에 보관해 기간별 결과만 돌려받는다.
 
-### Variable Properties
-Variables can be defined on dashboards or panels.
-Dashboard variables are available to all panels in that dashboard, and panel variables are only available to that panel.
+- 서버 시작·장부 재로드 시, 엔진 세션의 전체 거래를 Rustfava가 불러온 거래와 비교한다. 생성 거래와 파일명·줄번호 메타데이터도 비교 대상이다. 시작 시간과 메모리 사용량은 증가한다.
+- 전체 결과가 일치할 때만 기간 최적화를 사용한다. 로더나 패딩 처리 차이가 있으면 기존 Rustfava 경로를 사용한다.
+- 계정·검색 필터가 있으면 기존 필터 순서를 유지한다. 이 경우 새 기간의 첫 조회 지연은 남을 수 있다.
+- 장부 재로드 시 기간·BQL 결과 캐시를 비운다. Rustfava 원본 소스 파일은 수정하지 않으며, 해당 장부 인스턴스의 `get_filtered` 호출을 확장 소유 어댑터로 감싼다.
+- 측정 수치는 환경과 장부 크기에 따라 달라진다. 기간 처리 개선이 페이지 전체 로딩 시간을 보장하지는 않는다.
 
-* `name`: variable name
-* `label`: optional display label. Default: variable name
-* `display`: optional variable control type. Must be one of `select` or `toggle`. Default: `select`
-* `style`: optional custom MUI style properties for the variable control
-* `multiple`: optional flag to allow selecting multiple values. Default: `false`
-* `options`: a JavaScript function which returns the available values
-* `default`: optional default value. Use an array when `multiple` is `true`
+## 검증 범위와 제한
 
-### Panel Properties
-* `title`: optional title of the panel
-* `width`: optional width of the panel. Default: 100%
-* `height`: optional height of the panel. Default: 400px
-* `link`: optional link target of the panel header
-* `variables`: optional list of panel-level [variables](#variable-properties)
-* `kind`: panel kind. Must be one of `html`, `echarts`, `d3_sankey`, `table` or `react`
-* `spec`: a JavaScript function which generates a valid spec depending on the panel `kind`
+- 확장 로드, JS 모듈, BQL, 월별 필터, 빈 기간, 기초잔액, 패딩·원가·가격·메타데이터, 재로드와 실패 시 원래 경로 복귀를 검증한다.
+- 기존 5개 화면은 원본 BQL 차트를 재사용한다. 원본 여행 화면은 통합 예제에서 제외했다. 원본 예제 자체는 보존했다.
+- 추가 손익·현금흐름·대출 예제는 원화 정수와 예제 계정·태그 규칙을 사용한다. 다른 장부에 맞는 현금·대출 계정과 분류 규칙은 별도 설정이 필요하다. 자동 회계 분류나 다중 통화 환산을 제공하지 않는다.
+- 지원 설정은 v2 JavaScript/TypeScript/JSX/TSX이다. 원본 v1 YAML은 지원하지 않는다.
+- 원본 Playwright 스냅샷·Docker·Sphinx 문서는 일반 Fava용 참고 자료이며, Rustfava 호환성 검증을 대신하지 않는다. 원본 문서는 [upstream-readme.md](docs/upstream-readme.md)에 보존했다.
 
-The `spec` function is called with an object containing the following properties:
-* `panel`: the current panel definition
-* `variables`: the resolved dashboard and panel variables
-* `ledger.dateFirst`: start date of the current date filter, or first transaction date of the ledger
-* `ledger.dateLast`: end date of the current date filter, or last transaction date of the ledger
-* `ledger.filterFirst`: start date of the current date filter, or null if no date filter is set
-* `ledger.filterLast`: end date of the current date filter, or null if no date filter is set
-* `ledger.operatingCurrencies`: configured operating currencies of the ledger
-* `ledger.ccy`: shortcut for the first configured operating currency of the ledger
-* `ledger.accounts`: declared accounts of the ledger
-* `ledger.commodities`: declared commodities of the ledger
-* `ledger.query(bql)`: executes the specified BQL query
-* `ledger.urlFor(url)`: adds current Fava filter parameters to url
+## 개발·검증
 
-### HTML panel
-The `spec` code of HTML panels must return valid HTML.
-The HTML code will be rendered in the panel.
+Node.js 24 LTS와 pnpm을 사용한다. Python과 프런트엔드 의존성은 별도로 설치한다.
 
-### ECharts panel
-The `spec` code of [Apache ECharts](https://echarts.apache.org) panels must return valid [Apache ECharts](https://echarts.apache.org) chart options.
-Please take a look at the [ECharts examples](https://echarts.apache.org/examples) to get familiar with the available chart types and options.
+```sh
+uv sync
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend run build
+pnpm --dir frontend run type-check
+uv run pytest -q src/fava_dashboards/utils_test.py tests
+uv run python tests/test_hospital_dashboard.py > /tmp/dashboard-postings.json
+env HOSPITAL_POSTINGS_JSON=/tmp/dashboard-postings.json node --test tests/hospital-dashboard.test.mjs
+```
 
-### d3-sankey panel
-The `spec` code of d3-sankey panels must return valid d3-sankey chart options.
-Please take a look at the example dashboard configuration [dashboards.tsx](example/dashboards.tsx).
+## 원본과 라이선스
 
-### Table panel
-The `spec` code of table panels must return valid [MUI X Data Grid](https://mui.com/x/react-data-grid/) props.
-
-### React panel
-The `spec` code of React panels must return a valid JSX element.
-Please note that the code must not return a `Promise` (i.e. `async/await` is not supported).
-
-## View Example Ledger
-`cd example; fava example.beancount`
-
-## Contributing
-This plugin consists of a Python backend and a TypeScript frontend.
-
-Install [uv](https://docs.astral.sh/uv/) and Node.js 22, run `make deps` to install the dependencies, and `make dev` to run the Fava dev server with auto-rebuild.
-
-Before submitting a PR, please run `make build` to build the frontend in production mode, and add the compiled frontend to the PR.
-
-## Articles
-* [Dashboards with Beancount and Fava](https://www.andreasgerstmayr.at/2023/03/12/dashboards-with-beancount-and-fava.html)
-
-## Related Projects
-* [Fava Portfolio Returns](https://github.com/andreasgerstmayr/fava-portfolio-returns)
-* [Fava Investor](https://github.com/redstreet/fava_investor)
-* [Fava Classy Portfolio](https://github.com/seltzered/fava-classy-portfolio)
-
-## Acknowledgements
-Thanks to Martin Blais and all contributors of [Beancount](https://github.com/beancount/beancount),
-Jakob Schnitzer, Dominik Aumayr and all contributors of [Fava](https://github.com/beancount/fava),
-and to all contributors of [Apache ECharts](https://echarts.apache.org), [D3.js](https://d3js.org) and [d3-sankey](https://github.com/d3/d3-sankey).
+원본은 Andreas Gerstmayr와 기여자가 개발한 [fava-dashboards](https://github.com/andreasgerstmayr/fava-dashboards)이다. 이 저장소는 원본과 독립적으로 유지하는 Rustfava 호환 포크이다. 원본 MIT 저작권 고지와 [LICENSE.md](LICENSE.md)를 유지한다. Rustfava는 [rustledger/rustfava](https://github.com/rustledger/rustfava)에서 개발한다.

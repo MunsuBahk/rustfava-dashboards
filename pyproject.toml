@@ -1,7 +1,7 @@
 [project]
-name = "fava-dashboards"
-dynamic = ["version"]
-description = "Custom Dashboards for Beancount in Fava"
+name = "rustfava-dashboards"
+version = "0.1.0a1"
+description = "Custom Dashboards for Beancount in Rustfava"
 readme = "README.md"
 license = {text = "MIT License"}
 license-files = [
@@ -12,26 +12,25 @@ authors = [
 ]
 keywords = ["fava", "beancount", "dashboards"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",
     "Topic :: Office/Business :: Financial :: Accounting",
     "Topic :: Office/Business :: Financial :: Investment",
 ]
-requires-python = ">= 3.10"
+requires-python = ">= 3.13"
 dependencies = [
-    "fava>=1.30.12",
-    "Flask>=2.2",
-    "pyyaml>=6.0.1",
-    "beanquery>=0.1.0",
+    "rustfava>=1.32,<1.33",
 ]
 
+maintainers = [{ name = "MunsuBahk" }]
+
 [project.urls]
-Source = "https://github.com/andreasgerstmayr/fava-dashboards"
-Issues = "https://github.com/andreasgerstmayr/fava-dashboards/issues"
-Changelog = "https://github.com/andreasgerstmayr/fava-dashboards/blob/main/CHANGELOG.md"
+Source = "https://github.com/MunsuBahk/rustfava-dashboards"
+Upstream = "https://github.com/andreasgerstmayr/fava-dashboards"
+Issues = "https://github.com/MunsuBahk/rustfava-dashboards/issues"
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
@@ -46,9 +45,6 @@ dev = [
 
 [tool.hatch.metadata]
 allow-direct-references = true
-
-[tool.hatch.version]
-source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fava_dashboards"]
@@ -78,3 +74,6 @@ extend-select = ["I"]
 
 [tool.ruff.lint.isort]
 force-single-line = true
+
+[tool.hatch.build.targets.sdist]
+exclude = ["**/node_modules", "**/._*", "**/__pycache__", "/deployment", "/.venv"]

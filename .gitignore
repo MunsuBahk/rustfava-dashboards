@@ -11,3 +11,10 @@ wheels/
 
 # misc
 .DS_Store
+
+# Local deployment and financial data
+deployment/
+*.bean
+!example/**/*.bean
+node_modules/
+._*

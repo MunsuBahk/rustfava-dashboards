@@ -40,7 +40,9 @@ function DashboardPage() {
     );
   }
 
-  const dashboard = dashboards.find((d) => slugify(d.name) === dashboardName);
+  // Preserve bookmarks made before the Korean Assets label changed.
+  const selectedDashboard = dashboardName === "에셋" ? "자산" : dashboardName;
+  const dashboard = dashboards.find((d) => slugify(d.name) === selectedDashboard);
   if (!dashboard) {
     return <strong>Dashboard not found.</strong>;
   }

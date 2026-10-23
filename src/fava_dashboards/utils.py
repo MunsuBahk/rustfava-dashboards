@@ -1,60 +1,44 @@
+"""Common date and configuration helpers for the Rustfava adapter."""
+
+from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
-from typing import Sequence
 
-import yaml
-from fava.beans.abc import Directive
-from fava.beans.abc import Price
-from fava.beans.abc import Transaction
-from fava.helpers import FavaAPIError
+from rustfava.beans.abc import Directive
+from rustfava.beans.abc import Price
+from rustfava.beans.abc import Transaction
+from rustfava.helpers import RustfavaAPIError
 
 
-def read_dashboards_yaml(path: Path):
+def read_dashboards_tsx(path: Path) -> str:
+    """Read the dashboard's TypeScript configuration."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except Exception as ex:
-        raise FavaAPIError(
-            f"cannot read configuration file {path}: {ex}. To get started, use this template: https://github.com/andreasgerstmayr/fava-dashboards/blob/main/example/dashboards.tsx"
-        ) from ex
+        return path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise RustfavaAPIError(f"cannot read configuration file {path}: {error}") from error
 
 
-def read_dashboards_tsx(path: Path):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception as ex:
-        raise FavaAPIError(
-            f"cannot read configuration file {path}: {ex}. To get started, use this template: https://github.com/andreasgerstmayr/fava-dashboards/blob/main/example/dashboards.tsx"
-        ) from ex
+def get_ledger_duration(entries: Sequence[Directive]) -> tuple[date, date]:
+    """Return the date span covered by transactions and prices."""
+    date_first = next((entry.date for entry in entries if isinstance(entry, Transaction)), None)
+    date_last = next(
+        (entry.date for entry in reversed(entries) if isinstance(entry, (Transaction, Price))),
+        None,
+    )
+    if date_first is None or date_last is None:
+        raise RustfavaAPIError("no transactions found")
+    return date_first, date_last
 
 
-def get_ledger_duration(entries: Sequence[Directive]):
-    date_first = None
-    date_last = None
-    for entry in entries:
-        if isinstance(entry, Transaction):
-            date_first = entry.date
-            break
-    for entry in reversed(entries):
-        if isinstance(entry, (Transaction, Price)):
-            date_last = entry.date
-            break
-    if not date_first or not date_last:
-        raise FavaAPIError("no transactions found")
-    return (date_first, date_last)
-
-
-def clamp_to_ledger_range(filter_first: date, filter_last: date, ledger_first: date, ledger_last: date):
-    # Adjust the dates in case the date filter is set to e.g. 2023-2024, however the ledger only contains data up to summer 2024.
-    # Without this, all averages in the dashboard are off, because a wrong number of days between dateFirst and dateLast is calculated.
+def clamp_to_ledger_range(
+    filter_first: date,
+    filter_last: date,
+    ledger_first: date,
+    ledger_last: date,
+) -> tuple[date, date]:
+    """Clamp an overlapping date filter to the ledger's actual data range."""
     clamped_first = max(filter_first, ledger_first)
     clamped_last = min(filter_last, ledger_last)
-
-    # If there is no overlap of ledger and filter dates, leave them as-is.
-    # For example filter: 2020-2021, but ledger data goes from 2022-2023.
-    # The clamped date gives us from max(2020,2022) until min(2021,2023) = from 2022 until 2021, which is invalid.
     if clamped_first > clamped_last:
         return filter_first, filter_last
-
     return clamped_first, clamped_last

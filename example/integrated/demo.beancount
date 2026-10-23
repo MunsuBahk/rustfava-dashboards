@@ -1,0 +1,143 @@
+option "title" "Dashboard preview"
+option "operating_currency" "KRW"
+
+2024-12-31 open Assets:Cash:Bank KRW
+2024-12-31 open Assets:Cash:Till KRW
+2024-12-31 open Assets:Receivable KRW
+2024-12-31 open Assets:Equipment KRW
+2024-12-31 open Liabilities:Loans:A KRW
+2024-12-31 open Liabilities:Loans:B KRW
+2024-12-31 open Equity:Opening KRW
+2024-12-31 open Equity:Capital KRW
+2024-12-31 open Income:Clinical KRW
+2024-12-31 open Expenses:Supplies KRW
+2024-12-31 open Expenses:Rent KRW
+2024-12-31 open Expenses:Payroll KRW
+2024-12-31 open Expenses:Interest:A KRW
+2024-12-31 open Expenses:Interest:B KRW
+2024-12-31 custom "fava-extension" "fava_dashboards"
+
+2024-12-31 * "합성 기초잔액" #opening
+  id: "opening"
+  Assets:Cash:Bank         10000000 KRW
+  Liabilities:Loans:A     -20000000 KRW
+  Equity:Opening          10000000 KRW
+
+2025-01-05 * "1월 현금 진료매출" #operating
+  id: "jan-cash-sales"
+  Assets:Cash:Bank         10000000 KRW
+  Income:Clinical        -10000000 KRW
+
+2025-01-10 * "1월 외상 진료매출" #operating
+  id: "jan-credit-sales"
+  Assets:Receivable        2000000 KRW
+  Income:Clinical         -2000000 KRW
+
+2025-01-12 * "1월 환불" #operating
+  id: "jan-refund"
+  Income:Clinical          1000000 KRW
+  Assets:Cash:Bank        -1000000 KRW
+
+2025-01-15 * "의약품 및 소모품" #operating
+  id: "jan-supplies"
+  Expenses:Supplies        2000000 KRW
+  Assets:Cash:Bank        -2000000 KRW
+
+2025-01-20 * "장비 구입" #investing
+  id: "jan-equipment"
+  Assets:Equipment         4000000 KRW
+  Assets:Cash:Bank        -4000000 KRW
+
+2025-01-22 * "B 대출 실행" #financing #loan-draw
+  id: "jan-loan-b"
+  Assets:Cash:Bank          5000000 KRW
+  Liabilities:Loans:B      -5000000 KRW
+
+2025-01-25 * "원내 시재 이동" #operating
+  id: "jan-cash-transfer"
+  Assets:Cash:Till           500000 KRW
+  Assets:Cash:Bank          -500000 KRW
+
+2025-01-28 * "임차료" #operating
+  id: "jan-rent"
+  Expenses:Rent            1000000 KRW
+  Assets:Cash:Bank         -1000000 KRW
+
+2025-01-30 * "급여" #operating
+  id: "jan-payroll"
+  Expenses:Payroll         3000000 KRW
+  Assets:Cash:Bank         -3000000 KRW
+
+2025-01-31 * "A 원금 및 이자 납부" #financing #loan-repayment
+  id: "jan-loan-payment"
+  Liabilities:Loans:A      1000000 KRW
+  Expenses:Interest:A       200000 KRW
+  Assets:Cash:Bank         -1200000 KRW
+
+2025-02-03 * "1월 외상매출 회수" #operating
+  id: "feb-receivable"
+  Assets:Cash:Bank          2000000 KRW
+  Assets:Receivable        -2000000 KRW
+
+2025-02-05 * "2월 진료매출" #operating
+  id: "feb-sales"
+  Assets:Cash:Bank         13000000 KRW
+  Income:Clinical        -13000000 KRW
+
+2025-02-15 * "의약품 및 소모품" #operating
+  id: "feb-supplies"
+  Expenses:Supplies        2500000 KRW
+  Assets:Cash:Bank        -2500000 KRW
+
+2025-02-20 * "자본 투입" #financing
+  id: "feb-capital"
+  Assets:Cash:Bank          2000000 KRW
+  Equity:Capital          -2000000 KRW
+
+2025-02-25 * "임차료" #operating
+  id: "feb-rent"
+  Expenses:Rent            1000000 KRW
+  Assets:Cash:Bank         -1000000 KRW
+
+2025-02-27 * "급여" #operating
+  id: "feb-payroll"
+  Expenses:Payroll         3500000 KRW
+  Assets:Cash:Bank         -3500000 KRW
+
+2025-02-28 * "A 원금 및 이자 납부" #financing #loan-repayment
+  id: "feb-loan-a-payment"
+  Liabilities:Loans:A      1000000 KRW
+  Expenses:Interest:A       190000 KRW
+  Assets:Cash:Bank         -1190000 KRW
+
+2025-02-28 * "B 원금 및 이자 납부" #financing #loan-repayment
+  id: "feb-loan-b-payment"
+  Liabilities:Loans:B       500000 KRW
+  Expenses:Interest:B        50000 KRW
+  Assets:Cash:Bank          -550000 KRW
+
+2026-01-05 * "다음 연도 진료매출" #operating
+  id: "next-year-sales"
+  Assets:Cash:Bank          1000000 KRW
+  Income:Clinical         -1000000 KRW
+
+2026-01-10 * "다음 연도 추가 대출" #financing #loan-draw
+  id: "next-year-loan"
+  Assets:Cash:Bank          3000000 KRW
+  Liabilities:Loans:B      -3000000 KRW
+
+2024-12-31 commodity DEMO
+  name: "합성 투자상품"
+  asset_class: "Fund"
+  asset_allocation_Equity_Demo: 100
+2024-12-31 open Assets:Investments:Demo DEMO
+2024-12-31 * "합성 투자 기초잔액" #opening
+  id: "demo-investment-opening"
+  Assets:Investments:Demo  10 DEMO {1000 KRW}
+  Equity:Opening          -10000 KRW
+2024-12-31 price DEMO 1000 KRW
+2025-01-31 price DEMO 1200 KRW
+2025-02-28 price DEMO 1250 KRW
+2024-01-01 price CPI 100 KRW
+2025-01-01 price CPI 103 KRW
+2026-01-01 price CPI 105 KRW

@@ -4,7 +4,7 @@
     "scripts": {
         "build": "esbuild src/extension.ts --bundle --format=esm --loader:.css=file --outfile=../src/fava_dashboards/FavaDashboards.js --minify",
         "build:dts": "rm -r dist; tsc; node dist/scripts/build-dts.js",
-        "build:echarts-themes": "tsc; node dist/scripts/build-echarts-themes.js; npm run lint:fix",
+        "build:echarts-themes": "tsc; node dist/scripts/build-echarts-themes.js; pnpm run lint:fix",
         "watch": "esbuild src/extension.ts --bundle --format=esm --loader:.css=file --outfile=../src/fava_dashboards/FavaDashboards.js --watch",
         "test:e2e": "playwright test",
         "type-check": "tsc --noEmit && tsc -p tests/dashboards/tsconfig.json --noEmit",
@@ -48,5 +48,6 @@
         "react-dom": "^19.2.3",
         "react-error-boundary": "^6.1.0",
         "zod": "^4.3.6"
-    }
+    },
+    "packageManager": "pnpm@12.4.1"
 }

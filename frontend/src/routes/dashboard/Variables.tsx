@@ -7,6 +7,13 @@ import { Ledger } from "../../schemas/v2/ledger";
 import { Variable } from "../../schemas/v2/schema";
 import { StrictResolvedVariables, VariableType } from "../../schemas/v2/variables";
 
+// Keep option values stable in URLs and chart filters; translate display only.
+const optionLabels: Record<string, string> = {
+  "All assets": "전체 자산",
+  "Only investments": "투자 자산만",
+};
+const optionLabel = (option: string) => optionLabels[option] ?? option;
+
 interface VariablesToolbarProps {
   ledger: Ledger;
   variables: Variable[];
@@ -67,7 +74,7 @@ function VariableToolbar({ ledger, variables }: VariableToolbarProps) {
       >
         {options.map((option) => (
           <ToggleButton key={option} value={option}>
-            {option}
+            {optionLabel(option)}
           </ToggleButton>
         ))}
       </ToggleButtonGroup>
@@ -82,6 +89,7 @@ function VariableToolbar({ ledger, variables }: VariableToolbarProps) {
         multiple
         disableCloseOnSelect
         options={options}
+        getOptionLabel={optionLabel}
         value={value as VariableType[]}
         onChange={(_event, newValue: VariableType[]) => {
           setValue(newValue);
@@ -92,7 +100,7 @@ function VariableToolbar({ ledger, variables }: VariableToolbarProps) {
           return (
             <li key={key} {...optionProps}>
               <Checkbox style={{ marginRight: 8 }} checked={selected} />
-              {option}
+              {optionLabel(option)}
             </li>
           );
         }}
@@ -107,6 +115,7 @@ function VariableToolbar({ ledger, variables }: VariableToolbarProps) {
       size="small"
       disableClearable
       options={options}
+      getOptionLabel={optionLabel}
       value={value as VariableType}
       onChange={(_event, newValue: VariableType | null) => {
         setValue(newValue ?? variable.default ?? options[0]);

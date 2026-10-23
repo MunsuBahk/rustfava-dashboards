@@ -24,7 +24,18 @@ function getExtensionPath() {
 
 export function slugify(s: string) {
   return s
-    .replaceAll(/[^a-zA-Z0-9]/g, "-")
+    .replaceAll(/[^\p{L}\p{N}]/gu, "-")
     .replaceAll(/-{2,}/g, "_")
     .toLowerCase();
 }
+
+// Keep Rustfava's host URL store in sync with extension-only navigation.
+// The host handles popstate using its existing partial-page loader; React and
+// its query/config caches stay mounted, without reloading the whole document.
+let hostSyncedURL = window.location.href;
+router.subscribe("onResolved", () => {
+  const next = window.location.href;
+  if (next === hostSyncedURL) return;
+  hostSyncedURL = next;
+  window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+});
