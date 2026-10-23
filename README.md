@@ -15,35 +15,31 @@
 
 ## 설치 전 준비
 
-아래 명령은 **macOS와 Linux의 터미널**을 기준으로 안내합니다. 먼저 Git과 [uv](https://docs.astral.sh/uv/getting-started/installation/)가 설치되어 있어야 합니다.
+아래 명령은 **macOS와 Linux의 터미널**을 기준으로 안내합니다. 기본 설치에는 Git과 Python 3.13 이상이 필요합니다. Python 기본 도구인 `venv`로 가상환경을 만들고 `pip`로 패키지를 설치합니다.
 
 ```sh
 git --version
-uv --version
+python3 --version
 ```
 
-명령을 찾을 수 없다면 [Git 설치 안내](https://git-scm.com/install/)에 따라 Git을 먼저 설치합니다. uv는 공식 설치 명령으로 설치할 수 있습니다.
+명령을 찾을 수 없거나 Python 버전이 3.13 미만이라면 [Git 설치 안내](https://git-scm.com/install/)와 [Python 다운로드 안내](https://www.python.org/downloads/)를 참고해 준비합니다. 설치한 Python 3.13 이상이 `python3` 명령으로 실행되는지 확인합니다.
 
-```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-uv 설치 후에는 터미널을 다시 열고 `uv --version`을 확인합니다.
-
-- Python 3.13 이상을 지원하며, 아래 예제에서는 3.14를 사용합니다. 해당 버전이 없으면 uv가 [Python을 자동으로 내려받습니다](https://docs.astral.sh/uv/guides/install-python/#automatic-python-downloads).
 - Rustfava와 필요한 Python 패키지는 함께 설치됩니다. 별도로 설치된 Rustfava가 없어도 시작할 수 있습니다.
 - 빌드한 프런트엔드가 포함되어 있으므로 예제를 실행할 때 Node.js나 pnpm을 설치할 필요는 없습니다.
 - 첫 설치와 첫 실행에는 패키지 및 rustledger WASM 구성 요소를 내려받기 위한 인터넷 연결이 필요합니다.
+- uv는 선택 가능한 설치 도구입니다. 사용 방법은 아래의 별도 항목에서 안내합니다.
 
 ## 합성 예제로 시작하기
 
-먼저 가상 거래만 들어 있는 예제를 실행해 볼 수 있습니다. 다음 명령은 새 `rustfava-dashboards` 디렉터리와 그 안의 `.venv` 가상환경을 사용합니다.
+먼저 가상 거래만 들어 있는 예제를 실행해 볼 수 있습니다. 다음 명령은 새 `rustfava-dashboards` 디렉터리와 그 안의 `.venv` 가상환경을 사용합니다. 가상환경 안의 실행 파일을 직접 지정하므로 별도의 활성화 명령 없이 사용할 수 있습니다.
+
+### 기본 설치: venv와 pip
 
 ```sh
 git clone https://github.com/MunsuBahk/rustfava-dashboards.git
 cd rustfava-dashboards
-uv venv --python 3.14
-uv pip install --python .venv/bin/python .
+python3 -m venv .venv
+.venv/bin/python -m pip install .
 .venv/bin/python example/integrated/build_config.py
 .venv/bin/rustfava --host 127.0.0.1 --port 5099 --read-only --poll-watcher example/integrated/demo.beancount
 ```
@@ -57,9 +53,29 @@ uv pip install --python .venv/bin/python .
 - 예제의 거래·금액·투자상품·물가지수는 모두 합성 자료입니다.
 - 서버가 실행 중인 동안에는 터미널을 열어 둡니다. 종료할 때는 해당 터미널에서 `Ctrl+C`를 누릅니다.
 
+### 대안: uv로 설치하기
+
+uv를 사용하는 경우에는 기본 설치의 `python3 -m venv .venv`와 `pip install` 단계를 다음 명령으로 대신할 수 있습니다. 새로 복제한 저장소 디렉터리에서 실행하며, 두 설치 방식 중 하나를 선택합니다.
+
+uv가 없다면 [공식 설치 안내](https://docs.astral.sh/uv/getting-started/installation/)를 참고하거나 다음 명령으로 설치합니다. 설치 후 터미널을 다시 열고 `uv --version`을 확인합니다.
+
+```sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+```sh
+uv venv --python 3.14
+uv pip install --python .venv/bin/python .
+.venv/bin/python example/integrated/build_config.py
+.venv/bin/rustfava --host 127.0.0.1 --port 5099 --read-only --poll-watcher example/integrated/demo.beancount
+```
+
+Python 3.14가 없으면 uv가 [해당 버전을 자동으로 내려받습니다](https://docs.astral.sh/uv/guides/install-python/#automatic-python-downloads). 실행 후에는 기본 설치와 같은 브라우저 주소로 접속합니다.
+
 ### 실행 중 확인할 점
 
 - **처음 실행할 때 시간이 걸리는 경우:** WASM 구성 요소 다운로드와 장부 검증이 끝날 때까지 기다립니다. 서버가 시작된 다음 브라우저를 열면 됩니다.
+- **Linux에서 `venv` 생성에 실패하는 경우:** Python 배포판의 `venv`·`ensurepip` 구성 요소가 설치되어 있는지 확인합니다. Debian·Ubuntu의 기본 Python을 사용하는 경우에는 `python3-venv` 패키지가 필요할 수 있습니다.
 - **5099번 포트가 이미 사용 중인 경우:** 실행 명령의 `--port 5099`와 브라우저 주소의 `:5099`를 모두 다른 포트 번호로 바꿉니다.
 - **다른 컴퓨터에서 접속하는 경우:** 위 명령의 `127.0.0.1`은 서버가 실행 중인 컴퓨터 안에서만 접속할 수 있는 주소입니다. 원격 서버에 설치했다면 서버 주소·접속 경로를 별도로 설정해야 합니다.
 
@@ -115,7 +131,23 @@ Rustfava 1.32에서는 새 기간을 조회할 때 전체 Python 거래 목록�
 
 ## 개발·검증
 
-소스를 수정할 때는 Node.js 24 LTS와 pnpm이 필요합니다. 저장소에는 pnpm 버전이 고정되어 있습니다. 다음 명령으로 Python·프런트엔드 의존성을 설치하고 빌드와 테스트를 실행할 수 있습니다.
+이 절은 소스를 수정하고 빌드·테스트할 때 사용하는 개발 절차입니다. 일반적인 설치·실행에는 필요하지 않습니다.
+
+Python 개발 환경에는 uv를, 프런트엔드에는 Node.js 24 LTS와 pnpm을 사용합니다. 이는 이 저장소에서 선택한 개발 도구이며, 저장소에 pnpm 버전이 고정되어 있습니다. uv 설치 방법은 위의 대안 설치 항목에서 안내합니다. pnpm이 없다면 [공식 설치 안내](https://pnpm.io/installation)를 참고하거나 다음 독립 실행 설치 명령을 사용할 수 있습니다.
+
+```sh
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+```
+
+설치 후 터미널을 다시 열고 도구 버전을 확인합니다.
+
+```sh
+uv --version
+node --version
+pnpm --version
+```
+
+다음 명령으로 개발 의존성을 설치하고 빌드와 테스트를 실행할 수 있습니다.
 
 ```sh
 uv sync --locked
