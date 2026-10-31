@@ -26,9 +26,10 @@ async function monthlyAccountChart({ ledger, variables }, includeIncome = false)
   const sorted = [...accounts].sort((a, b) => a === "Income" ? -1 : b === "Income" ? 1 : a.localeCompare(b));
   const formatter = getCurrencyFormatter(currency);
   return {
+    ...(includeIncome ? { mobileMinWidth: Math.max(480, months.length * 80 + 160) } : {}),
     tooltip: { trigger: "axis", valueFormatter: anyFormatter(formatter) },
     legend: { bottom: 0, type: "scroll" },
-    grid: { bottom: 80, containLabel: true },
+    grid: { ...(includeIncome ? { left: 16, right: 16 } : {}), bottom: 80, containLabel: true },
     xAxis: { type: "category", data: months },
     yAxis: { type: "value", axisLabel: { formatter } },
     series: sorted.map(account => ({

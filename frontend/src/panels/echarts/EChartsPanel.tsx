@@ -1,3 +1,4 @@
+import { Box } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { dispose, ECElementEvent, ECharts, EChartsOption, init } from "echarts";
 import { useEffect, useRef } from "react";
@@ -10,6 +11,8 @@ export type EChartsThemeName = keyof typeof themes;
 export const EChartsThemeNames = Object.keys(themes) as ReadonlyArray<EChartsThemeName>;
 
 export interface EChartsSpec extends EChartsOption {
+  /** Optional horizontal chart width on phone-sized screens. */
+  mobileMinWidth?: number;
   onClick?: (params: ECElementEvent) => void;
   onDblClick?: (params: ECElementEvent) => void;
 }
@@ -39,7 +42,7 @@ export function EChartsPanel({ spec }: PanelProps<EChartsSpec>) {
       width: rect.width,
       height: rect.height,
     });
-    const { onClick, onDblClick, ...option } = spec;
+    const { onClick, onDblClick, mobileMinWidth: _mobileMinWidth, ...option } = spec;
 
     if (onClick) {
       chart.on("click", onClick);
@@ -64,6 +67,14 @@ export function EChartsPanel({ spec }: PanelProps<EChartsSpec>) {
       chartRef.current.resize({ width: rect.width, height: rect.height });
     }
   }, [rect]);
+
+  if (spec.mobileMinWidth) {
+    return (
+      <Box sx={{ height: "100%", overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch" }}>
+        <Box ref={ref} sx={{ height: "100%", "@media (max-width: 767px)": { minWidth: spec.mobileMinWidth } }} />
+      </Box>
+    );
+  }
 
   return <div ref={ref} style={{ height: "100%" }}></div>;
 }
