@@ -1,10 +1,11 @@
-import { Box } from "@mui/material";
+import { Box, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { dispose, ECElementEvent, ECharts, EChartsOption, init } from "echarts";
 import { useEffect, useRef } from "react";
 import { useConfigContext } from "../../components/ConfigProvider";
 import { useResizeObserver } from "../../components/hooks";
 import { PanelProps } from "../registry";
+import { inferMobileChartWidth } from "./mobileChartWidth";
 import * as themes from "./themes";
 
 export type EChartsThemeName = keyof typeof themes;
@@ -19,6 +20,8 @@ export interface EChartsSpec extends EChartsOption {
 
 export function EChartsPanel({ spec }: PanelProps<EChartsSpec>) {
   const theme = useTheme();
+  const isPhone = useMediaQuery("(max-width: 767px)");
+  const mobileMinWidth = spec.mobileMinWidth ?? inferMobileChartWidth(spec);
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ECharts>(null);
   const rect = useResizeObserver(ref);
@@ -56,11 +59,20 @@ export function EChartsPanel({ spec }: PanelProps<EChartsSpec>) {
       option.backgroundColor = "transparent";
     }
 
+    if (isPhone && mobileMinWidth && option.xAxis) {
+      const grids = Array.isArray(option.grid) ? option.grid : [option.grid ?? {}];
+      option.grid = grids.map((grid) => ({
+        ...grid,
+        left: typeof grid.left === "number" ? grid.left : 16,
+        right: typeof grid.right === "number" ? grid.right : 16,
+        containLabel: grid.containLabel ?? true,
+      }));
+    }
     chart.setOption(option);
     chartRef.current = chart;
 
     return cleanup;
-  }, [spec, echartsTheme, rect]);
+  }, [spec, echartsTheme, rect, isPhone, mobileMinWidth]);
 
   useEffect(() => {
     if (chartRef.current && rect) {
@@ -68,15 +80,18 @@ export function EChartsPanel({ spec }: PanelProps<EChartsSpec>) {
     }
   }, [rect]);
 
-  if (spec.mobileMinWidth) {
-    return (
-      <Box sx={{ height: "100%", overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch" }}>
-        <Box ref={ref} sx={{ height: "100%", "@media (max-width: 767px)": { minWidth: spec.mobileMinWidth } }} />
-      </Box>
-    );
-  }
-
-  return <div ref={ref} style={{ height: "100%" }}></div>;
+  return (
+    <Box
+      sx={{
+        height: "100%",
+        overflowX: mobileMinWidth ? "auto" : "visible",
+        overflowY: mobileMinWidth ? "hidden" : "visible",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      <Box ref={ref} sx={{ height: "100%", "@media (max-width: 767px)": { minWidth: mobileMinWidth ?? 0 } }} />
+    </Box>
+  );
 }
 
 function loadTheme(theme: EChartsThemeName | object | undefined) {
