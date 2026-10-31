@@ -1,1 +1,10 @@
+<style>
+  /* On phones, keep vertical scrolling on the document instead of a nested article. */
+  @media (max-width: 767px) {
+    article:has(> #favaDashboardsApp) {
+      overflow-x: clip;
+      overflow-y: visible;
+    }
+  }
+</style>
 <div id="favaDashboardsApp"></div>
